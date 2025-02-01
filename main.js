@@ -1,9 +1,10 @@
 
-
 let peer = null;
 let connection = null;
 let localStream = null;
 let call = null;
+let typingTimeout = null;
+let liveMode = false;
 
 // Initialize PeerJS
 function initializePeer() {
@@ -96,15 +97,53 @@ function setupConnection() {
         document.getElementById('connection-panel').classList.add('hidden');
         document.getElementById('chat-panel').classList.remove('hidden');
         document.getElementById('peer-id-label').textContent = connection.peer;
+        setupLiveMode();
     });
 
     connection.on('data', (data) => {
-        addMessage(data, false);
+        if (data.type === 'typing') {
+            handleTypingPreview(data.text);
+        } else {
+            addMessage(data.text, false);
+            document.getElementById('live-preview').textContent = '';
+        }
     });
 
     connection.on('close', () => {
         resetChat();
     });
+}
+
+// Setup live mode
+function setupLiveMode() {
+    const liveModeToggle = document.getElementById('live-mode-toggle');
+    const messageInput = document.getElementById('message-input');
+
+    liveModeToggle.addEventListener('change', (e) => {
+        liveMode = e.target.checked;
+        document.getElementById('live-preview').classList.toggle('hidden', !liveMode);
+    });
+
+    messageInput.addEventListener('input', (e) => {
+        if (liveMode && connection) {
+            connection.send({
+                type: 'typing',
+                text: e.target.value
+            });
+        }
+    });
+}
+
+// Handle typing preview
+function handleTypingPreview(text) {
+    const livePreview = document.getElementById('live-preview');
+    if (text) {
+        livePreview.textContent = `${connection.peer} is typing: ${text}`;
+        livePreview.classList.remove('hidden');
+    } else {
+        livePreview.textContent = '';
+        livePreview.classList.add('hidden');
+    }
 }
 
 // Send a message
@@ -113,9 +152,20 @@ window.sendMessage = () => {
     const message = input.value.trim();
     
     if (message && connection) {
-        connection.send(message);
+        connection.send({
+            type: 'message',
+            text: message
+        });
         addMessage(message, true);
         input.value = '';
+        
+        // Clear live preview when message is sent
+        if (liveMode) {
+            connection.send({
+                type: 'typing',
+                text: ''
+            });
+        }
     }
 };
 
@@ -152,6 +202,9 @@ function resetChat() {
     document.getElementById('chat-panel').classList.add('hidden');
     document.getElementById('messages').innerHTML = '';
     document.getElementById('peer-id').value = '';
+    document.getElementById('live-preview').textContent = '';
+    document.getElementById('live-mode-toggle').checked = false;
+    liveMode = false;
     connection = null;
 }
 

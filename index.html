@@ -15,19 +15,22 @@
     <video id="remoteVideo" autoplay playsinline></video>
     
     <h3>Your Unique ID: <span id="userId"></span></h3>
-	<h3>Media: <span id="media"></span></h3>
-	<h3>Start Call Method: <span id="start"></span></h3>
-	<h3>Error: <span id="error"></span></h3>
+    <h3>Media: <span id="media"></span></h3>
+    <h3>Start Call Method: <span id="start"></span></h3>
+    <h3>Error: <span id="error"></span></h3>
     <button onclick="startCall()">Start Call</button>
     <button onclick="acceptCall()">Accept Call</button>
     <button onclick="stopVideo()">Stop Video</button>
+    <button onclick="removeAnswer()">Reset Call</button>
     
     <h3>SDP Exchange</h3>
     <textarea id="offer" placeholder="Paste remote SDP here..."></textarea>
     <button onclick="setRemoteDescription()">Set Remote Description</button>
+    <button onclick="copyToClipboard('offer')">Copy Offer</button>
     
     <h3>Generated SDP</h3>
     <textarea id="answer" readonly></textarea>
+    <button onclick="copyToClipboard('answer')">Copy Answer</button>
     
     <script>
         let localStream;
@@ -36,55 +39,57 @@
         document.getElementById("userId").innerText = userId;
 
         async function startCall() {
-			try{
-				document.getElementById("start").innerText = "Start"
-	            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-				console.log("Media: ", localStream);
-				document.getElementById("media").innerText = localStream.active ? "Active" : "Inactive";
-	            document.getElementById("localVideo").srcObject = localStream;
-	            peerConnection = new RTCPeerConnection();
-	            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-	            peerConnection.ontrack = event => document.getElementById("remoteVideo").srcObject = event.streams[0];
-	            peerConnection.onicecandidate = event => {
-	                if (event.candidate) {
-	                    console.log("ICE Candidate:", event.candidate);
-	                }
-	            };
-	            const offer = await peerConnection.createOffer();
-	            await peerConnection.setLocalDescription(offer);
-	            document.getElementById("answer").value = JSON.stringify(offer);
-			}
-			catch(error){
-				document.getElementById("error").innerText = error
-			}
+            try {
+                document.getElementById("start").innerText = "Start";
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                console.log("Media: ", localStream);
+                document.getElementById("media").innerText = localStream.active ? "Active" : "Inactive";
+                document.getElementById("localVideo").srcObject = localStream;
+                peerConnection = new RTCPeerConnection();
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                peerConnection.ontrack = event => document.getElementById("remoteVideo").srcObject = event.streams[0];
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        console.log("ICE Candidate:", event.candidate);
+                    }
+                };
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                document.getElementById("answer").value = JSON.stringify(offer);
+            } catch (error) {
+                document.getElementById("error").innerText = error;
+            }
         }
 
         async function acceptCall() {
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            document.getElementById("localVideo").srcObject = localStream;
-            peerConnection = new RTCPeerConnection();
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            peerConnection.ontrack = event => document.getElementById("remoteVideo").srcObject = event.streams[0];
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    console.log("ICE Candidate:", event.candidate);
-                }
-            };
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById("localVideo").srcObject = localStream;
+                peerConnection = new RTCPeerConnection();
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                peerConnection.ontrack = event => document.getElementById("remoteVideo").srcObject = event.streams[0];
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        console.log("ICE Candidate:", event.candidate);
+                    }
+                };
+            } catch (error) {
+                document.getElementById("error").innerText = error;
+            }
         }
 
         async function setRemoteDescription() {
-		try{
-	            const remoteSDP = JSON.parse(document.getElementById("offer").value);
-	            await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteSDP));
-	            if (remoteSDP.type === "offer") {
-	                const answer = await peerConnection.createAnswer();
-	                await peerConnection.setLocalDescription(answer);
-	                document.getElementById("answer").value = JSON.stringify(answer);
-	            }
-		}
-		catch (error){
-			document.getElementById("error").innerText = error
-		}
+            try {
+                const remoteSDP = JSON.parse(document.getElementById("offer").value);
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteSDP));
+                if (remoteSDP.type === "offer") {
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    document.getElementById("answer").value = JSON.stringify(answer);
+                }
+            } catch (error) {
+                document.getElementById("error").innerText = error;
+            }
         }
 
         function stopVideo() {
@@ -92,6 +97,39 @@
                 localStream.getTracks().forEach(track => track.stop());
                 document.getElementById("localVideo").srcObject = null;
             }
+        }
+
+        function removeAnswer() {
+            // Reset local stream and peer connection
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                document.getElementById("localVideo").srcObject = null;
+            }
+
+            // Clear the remote video stream
+            document.getElementById("remoteVideo").srcObject = null;
+
+            // Reset the peer connection
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            // Clear the SDP offer/answer
+            document.getElementById("offer").value = "";
+            document.getElementById("answer").value = "";
+
+            // Update UI
+            document.getElementById("media").innerText = "Inactive";
+            document.getElementById("start").innerText = "Start";
+            document.getElementById("error").innerText = "";
+        }
+
+        function copyToClipboard(id) {
+            const textArea = document.getElementById(id);
+            textArea.select();
+            document.execCommand("copy");
+            alert(`${id} copied to clipboard!`);
         }
     </script>
 </body>

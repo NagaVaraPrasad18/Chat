@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.message {
+    @apply max-w-[70%] rounded-lg px-4 py-2 mb-2;
+}
+
+.message.sent {
+    @apply bg-indigo-600 text-white ml-auto;
+}
+
+.message.received {
+    @apply bg-gray-200 text-gray-800;
+}
+
+#local-video, #remote-video {
+    @apply aspect-video object-cover;
+    transform: scaleX(-1);
+}

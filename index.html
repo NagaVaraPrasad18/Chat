@@ -36,6 +36,7 @@
         let localStream;
         let peerConnection;
         let userId = Math.floor(Math.random() * 10000);
+        let remoteSDPSet = false; // To track if remote description has been set
         document.getElementById("userId").innerText = userId;
 
         async function startCall() {
@@ -81,7 +82,13 @@
         async function setRemoteDescription() {
             try {
                 const remoteSDP = JSON.parse(document.getElementById("offer").value);
+                if (remoteSDPSet) {
+                    document.getElementById("error").innerText = "Remote SDP has already been set.";
+                    return;
+                }
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteSDP));
+                remoteSDPSet = true;  // Mark that remote SDP has been set
+
                 if (remoteSDP.type === "offer") {
                     const answer = await peerConnection.createAnswer();
                     await peerConnection.setLocalDescription(answer);
@@ -123,6 +130,7 @@
             document.getElementById("media").innerText = "Inactive";
             document.getElementById("start").innerText = "Start";
             document.getElementById("error").innerText = "";
+            remoteSDPSet = false; // Reset the remoteSDPSet flag
         }
 
         function copyToClipboard(id) {

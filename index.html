@@ -73,13 +73,18 @@
         }
 
         async function setRemoteDescription() {
-            const remoteSDP = JSON.parse(document.getElementById("offer").value);
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteSDP));
-            if (remoteSDP.type === "offer") {
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                document.getElementById("answer").value = JSON.stringify(answer);
-            }
+		try{
+	            const remoteSDP = JSON.parse(document.getElementById("offer").value);
+	            await peerConnection.setRemoteDescription(new RTCSessionDescription(remoteSDP));
+	            if (remoteSDP.type === "offer") {
+	                const answer = await peerConnection.createAnswer();
+	                await peerConnection.setLocalDescription(answer);
+	                document.getElementById("answer").value = JSON.stringify(answer);
+	            }
+		}
+		catch (error){
+			document.getElementById("error").innerText = error
+		}
         }
 
         function stopVideo() {

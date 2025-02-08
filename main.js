@@ -122,7 +122,6 @@ window.startVideo = async (isReceiving = false) => {
         }
     } catch (err) {
         console.error('Failed to get local stream', err);
-		document.getElementById("error").innerText = err;
         alert('Failed to start video: ' + err.message);
     }
 };

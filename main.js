@@ -1,17 +1,29 @@
 
+
 let peer = null;
 let connection = null;
 let localStream = null;
 let call = null;
-let typingTimeout = null;
+let currentCameraFacing = 'user';
 let liveMode = false;
+
+// Initialize PeerJS and setup DOM event listeners
+function initialize() {
+	console.log("initializePeer");
+    initializePeer();
+	console.log("setupDOMListeners")
+    setupDOMListeners();
+}
 
 // Initialize PeerJS
 function initializePeer() {
     peer = new Peer();
     
     peer.on('open', (id) => {
-        document.getElementById('my-id').value = id;
+        const myIdElement = document.getElementById('my-id');
+        if (myIdElement) {
+            myIdElement.value = id;
+        }
     });
 
     peer.on('connection', (conn) => {
@@ -23,6 +35,8 @@ function initializePeer() {
         call = incomingCall;
         if (confirm('Incoming video call. Accept?')) {
             startVideo(true);
+        } else {
+            incomingCall.close();
         }
     });
 
@@ -32,13 +46,72 @@ function initializePeer() {
     });
 }
 
+// Setup all DOM event listeners
+function setupDOMListeners() {
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        messageInput.addEventListener('input', (e) => {
+            if (liveMode && connection) {
+                connection.send({
+                    type: 'typing',
+                    text: e.target.value
+                });
+            }
+        });
+    }
+
+    // Add event listeners for buttons
+    const liveModeBtn = document.getElementById('live-mode-btn');
+    if (liveModeBtn) {
+        liveModeBtn.addEventListener('click', requestLiveMode);
+    }
+
+    const connectBtn = document.getElementById('connect-btn');
+    if (connectBtn) {
+        connectBtn.addEventListener('click', connectToPeer);
+    }
+
+    const copyBtn = document.getElementById('copy-btn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', copyToClipboard);
+    }
+
+    const disconnectBtn = document.getElementById('disconnect-btn');
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener('click', disconnect);
+    }
+}
+
 // Start video
 window.startVideo = async (isReceiving = false) => {
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        document.getElementById('local-video').srcObject = localStream;
-        document.getElementById('start-video').classList.add('hidden');
-        document.getElementById('end-video').classList.remove('hidden');
+        const constraints = {
+            video: { 
+                facingMode: currentCameraFacing
+            },
+            audio: true
+        };
+        
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const localVideo = document.getElementById('local-video');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.play().catch(e => console.error('Error playing local video:', e));
+        }
+        
+        const videoSection = document.getElementById('video-section');
+        const chatSection = document.getElementById('chat-section');
+        
+        if (videoSection && chatSection) {
+            videoSection.classList.remove('hidden');
+            chatSection.classList.add('hidden');
+        }
 
         if (isReceiving && call) {
             call.answer(localStream);
@@ -49,7 +122,53 @@ window.startVideo = async (isReceiving = false) => {
         }
     } catch (err) {
         console.error('Failed to get local stream', err);
+		document.getElementById("error").innerText = err;
         alert('Failed to start video: ' + err.message);
+    }
+};
+
+// Switch camera
+window.switchCamera = async () => {
+    if (!localStream) return;
+    
+    currentCameraFacing = currentCameraFacing === 'user' ? 'environment' : 'user';
+    
+    localStream.getTracks().forEach(track => track.stop());
+    
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+                facingMode: currentCameraFacing,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: true
+        });
+        
+        const localVideo = document.getElementById('local-video');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+            localVideo.play().catch(e => console.error('Error playing local video:', e));
+        }
+        
+        if (call && call.peerConnection) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            const audioTrack = localStream.getAudioTracks()[0];
+            
+            const senders = call.peerConnection.getSenders();
+            const videoSender = senders.find(sender => sender.track?.kind === 'video');
+            const audioSender = senders.find(sender => sender.track?.kind === 'audio');
+            
+            if (videoSender && videoTrack) {
+                videoSender.replaceTrack(videoTrack);
+            }
+            if (audioSender && audioTrack) {
+                audioSender.replaceTrack(audioTrack);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to switch camera:', err);
+        alert('Failed to switch camera: ' + err.message);
     }
 };
 
@@ -57,10 +176,20 @@ window.startVideo = async (isReceiving = false) => {
 window.endVideo = () => {
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
-        document.getElementById('local-video').srcObject = null;
-        document.getElementById('remote-video').srcObject = null;
-        document.getElementById('start-video').classList.remove('hidden');
-        document.getElementById('end-video').classList.add('hidden');
+        
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        const videoSection = document.getElementById('video-section');
+        const chatSection = document.getElementById('chat-section');
+        
+        if (localVideo) localVideo.srcObject = null;
+        if (remoteVideo) remoteVideo.srcObject = null;
+        
+        if (videoSection && chatSection) {
+            videoSection.classList.add('hidden');
+            chatSection.classList.remove('hidden');
+        }
+        
         if (call) {
             call.close();
             call = null;
@@ -71,17 +200,49 @@ window.endVideo = () => {
 // Setup call events
 function setupCallEvents(call) {
     call.on('stream', (remoteStream) => {
-        document.getElementById('remote-video').srcObject = remoteStream;
+        const remoteVideo = document.getElementById('remote-video');
+        if (remoteVideo) {
+            remoteVideo.srcObject = remoteStream;
+            remoteVideo.play().catch(e => console.error('Error playing remote video:', e));
+        }
     });
 
     call.on('close', () => {
-        document.getElementById('remote-video').srcObject = null;
+        const remoteVideo = document.getElementById('remote-video');
+        const videoSection = document.getElementById('video-section');
+        const chatSection = document.getElementById('chat-section');
+        
+        if (remoteVideo) remoteVideo.srcObject = null;
+        
+        if (videoSection && chatSection) {
+            videoSection.classList.add('hidden');
+            chatSection.classList.remove('hidden');
+        }
+    });
+
+    call.on('error', (err) => {
+        console.error('Call error:', err);
+        alert('Call error: ' + err.message);
+        endVideo();
     });
 }
 
+// Request live mode
+function requestLiveMode() {
+    if (connection) {
+        connection.send({
+            type: 'live-mode-request'
+        });
+        alert('Waiting for peer to accept Live Mode...');
+    }
+}
+
 // Connect to a peer
-window.connectToPeer = () => {
-    const peerId = document.getElementById('peer-id').value;
+function connectToPeer() {
+    const peerIdElement = document.getElementById('peer-id');
+    if (!peerIdElement) return;
+    
+    const peerId = peerIdElement.value;
     if (!peerId) {
         alert('Please enter a peer ID');
         return;
@@ -89,23 +250,33 @@ window.connectToPeer = () => {
 
     connection = peer.connect(peerId);
     setupConnection();
-};
+}
 
 // Setup connection event handlers
 function setupConnection() {
     connection.on('open', () => {
-        document.getElementById('connection-panel').classList.add('hidden');
-        document.getElementById('chat-panel').classList.remove('hidden');
-        document.getElementById('peer-id-label').textContent = connection.peer;
-        setupLiveMode();
+        const connectionPanel = document.getElementById('connection-panel');
+        const chatPanel = document.getElementById('chat-panel');
+        const peerIdLabel = document.getElementById('peer-id-label');
+        
+        if (connectionPanel) connectionPanel.classList.add('hidden');
+        if (chatPanel) chatPanel.classList.remove('hidden');
+        if (peerIdLabel) peerIdLabel.textContent = connection.peer;
     });
 
     connection.on('data', (data) => {
-        if (data.type === 'typing') {
+        if (data.type === 'live-mode-request') {
+            handleLiveModeRequest();
+        } else if (data.type === 'live-mode-response') {
+            handleLiveModeResponse(data.accepted);
+        } else if (data.type === 'typing' && liveMode) {
             handleTypingPreview(data.text);
-        } else {
+        } else if (data.type === 'message') {
             addMessage(data.text, false);
-            document.getElementById('live-preview').textContent = '';
+            const typingPreview = document.querySelector('.typing-preview');
+            if (typingPreview) {
+                typingPreview.remove();
+            }
         }
     });
 
@@ -114,44 +285,62 @@ function setupConnection() {
     });
 }
 
-// Setup live mode
-function setupLiveMode() {
-    const liveModeToggle = document.getElementById('live-mode-toggle');
-    const messageInput = document.getElementById('message-input');
-
-    liveModeToggle.addEventListener('change', (e) => {
-        liveMode = e.target.checked;
-        document.getElementById('live-preview').classList.toggle('hidden', !liveMode);
+function handleLiveModeRequest() {
+    const accept = confirm('The other user wants to enable Live Mode. Accept?');
+    liveMode = accept;
+    connection.send({
+        type: 'live-mode-response',
+        accepted: accept
     });
+    
+    const liveModeBtn = document.getElementById('live-mode-btn');
+    if (accept && liveModeBtn) {
+        liveModeBtn.textContent = 'Live Mode: ON';
+        liveModeBtn.classList.add('text-green-600');
+    }
+}
 
-    messageInput.addEventListener('input', (e) => {
-        if (liveMode && connection) {
-            connection.send({
-                type: 'typing',
-                text: e.target.value
-            });
+function handleLiveModeResponse(accepted) {
+    const liveModeBtn = document.getElementById('live-mode-btn');
+    if (accepted) {
+        liveMode = true;
+        if (liveModeBtn) {
+            liveModeBtn.textContent = 'Live Mode: ON';
+            liveModeBtn.classList.add('text-green-600');
         }
-    });
+        alert('Live Mode enabled!');
+    } else {
+        liveMode = false;
+        alert('Live Mode request was declined.');
+    }
 }
 
 // Handle typing preview
 function handleTypingPreview(text) {
-    const livePreview = document.getElementById('live-preview');
+    const messagesDiv = document.getElementById('messages');
+    if (!messagesDiv) return;
+    
+    const typingPreview = document.querySelector('.typing-preview');
+    if (typingPreview) {
+        typingPreview.remove();
+    }
+    
     if (text) {
-        livePreview.textContent = `${connection.peer} is typing: ${text}`;
-        livePreview.classList.remove('hidden');
-    } else {
-        livePreview.textContent = '';
-        livePreview.classList.add('hidden');
+        const previewElement = document.createElement('div');
+        previewElement.className = 'message received typing-preview';
+        previewElement.textContent = text;
+        messagesDiv.appendChild(previewElement);
+        previewElement.scrollIntoView({ behavior: 'smooth' });
     }
 }
 
 // Send a message
-window.sendMessage = () => {
+function sendMessage() {
     const input = document.getElementById('message-input');
-    const message = input.value.trim();
+    if (!input || !connection) return;
     
-    if (message && connection) {
+    const message = input.value.trim();
+    if (message) {
         connection.send({
             type: 'message',
             text: message
@@ -159,7 +348,6 @@ window.sendMessage = () => {
         addMessage(message, true);
         input.value = '';
         
-        // Clear live preview when message is sent
         if (liveMode) {
             connection.send({
                 type: 'typing',
@@ -167,11 +355,13 @@ window.sendMessage = () => {
             });
         }
     }
-};
+}
 
 // Add a message to the chat
 function addMessage(message, sent) {
     const messagesDiv = document.getElementById('messages');
+    if (!messagesDiv) return;
+    
     const messageElement = document.createElement('div');
     messageElement.className = `message ${sent ? 'sent' : 'received'}`;
     messageElement.textContent = message;
@@ -180,42 +370,52 @@ function addMessage(message, sent) {
 }
 
 // Copy ID to clipboard
-window.copyToClipboard = () => {
+function copyToClipboard() {
     const myId = document.getElementById('my-id');
+    if (!myId) return;
+    
     myId.select();
     document.execCommand('copy');
     alert('ID copied to clipboard!');
-};
+}
 
 // Disconnect from peer
-window.disconnect = () => {
+function disconnect() {
     if (connection) {
         connection.close();
     }
     endVideo();
     resetChat();
-};
+}
 
 // Reset chat UI
 function resetChat() {
-    document.getElementById('connection-panel').classList.remove('hidden');
-    document.getElementById('chat-panel').classList.add('hidden');
-    document.getElementById('messages').innerHTML = '';
-    document.getElementById('peer-id').value = '';
-    document.getElementById('live-preview').textContent = '';
-    document.getElementById('live-mode-toggle').checked = false;
+    const connectionPanel = document.getElementById('connection-panel');
+    const chatPanel = document.getElementById('chat-panel');
+    const messages = document.getElementById('messages');
+    const peerId = document.getElementById('peer-id');
+    const liveModeBtn = document.getElementById('live-mode-btn');
+    
+    if (connectionPanel) connectionPanel.classList.remove('hidden');
+    if (chatPanel) chatPanel.classList.add('hidden');
+    if (messages) messages.innerHTML = '';
+    if (peerId) peerId.value = '';
+    if (liveModeBtn) {
+        liveModeBtn.textContent = 'Enable Live Mode';
+        liveModeBtn.classList.remove('text-green-600');
+    }
+    
     liveMode = false;
     connection = null;
 }
 
-// Handle Enter key in message input
-document.addEventListener('DOMContentLoaded', () => {
-    initializePeer();
-    
-    const messageInput = document.getElementById('message-input');
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
-});
+console.log("document.readyState: ", document.readyState)
+// Wait for DOM to be fully loaded before initializing
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize);
+} else {
+    initialize();
+}
+
+console.log("JS Loaded!");
+window.addEventListener("load", () => console.log("Window loaded"));

@@ -18,76 +18,62 @@
                     <label class="block text-sm font-medium text-gray-700">Your ID:</label>
                     <div class="flex gap-2">
                         <input type="text" id="my-id" readonly class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <button onclick="copyToClipboard()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Copy</button>
+                        <button id="copy-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">Copy</button>
                     </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Connect to ID:</label>
                     <div class="flex gap-2">
                         <input type="text" id="peer-id" placeholder="Enter peer ID" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                        <button onclick="connectToPeer()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Connect</button>
+                        <button id="connect-btn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Connect</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Chat and Video Panel -->
+        <!-- Main Content -->
         <div id="chat-panel" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Video Call Section -->
-                <div class="bg-white rounded-lg shadow-md p-4">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold">Video Call</h2>
-                        <div class="space-x-2">
-                            <button id="start-video" onclick="startVideo()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start Video</button>
-                            <button id="end-video" onclick="endVideo()" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 hidden">End Video</button>
+            <!-- Chat Section -->
+            <div id="chat-section" class="bg-white rounded-lg shadow-md">
+                <div class="border-b p-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-semibold">Chat with: <span id="peer-id-label" class="text-indigo-600"></span></h2>
+                        <div class="flex items-center gap-4">
+                            <button id="live-mode-btn" class="text-indigo-600 hover:text-indigo-800">Enable Live Mode</button>
+                            <button onclick="startVideo()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Start Video Call</button>
+                            <button id="disconnect-btn" class="text-red-600 hover:text-red-800">Disconnect</button>
                         </div>
-                    </div>
-                    <div class="space-y-4">
-                        <video id="local-video" class="w-full bg-gray-200 rounded-lg" autoplay muted playsinline></video>
-                        <video id="remote-video" class="w-full bg-gray-200 rounded-lg" autoplay playsinline></video>
                     </div>
                 </div>
+                <div id="messages" class="h-[600px] overflow-y-auto p-4 space-y-4"></div>
+                <div class="border-t p-4">
+                    <div class="flex gap-2">
+                        <input type="text" id="message-input" placeholder="Type your message..." class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <button onclick="sendMessage()" class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700">Send</button>
+                    </div>
+					<h3>Error: <span id="error"></span></h3>
+                </div>
+            </div>
 
-                <!-- Chat Section -->
-                <div class="bg-white rounded-lg shadow-md">
-                    <div class="border-b p-4">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-xl font-semibold">Chat with: <span id="peer-id-label" class="text-indigo-600"></span></h2>
-                            <div class="flex items-center gap-4">
-                                <label class="inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="live-mode-toggle" class="sr-only peer">
-                                    <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                                    <span class="ml-2 text-sm font-medium text-gray-700">Live Mode</span>
-                                </label>
-                                <button onclick="disconnect()" class="text-red-600 hover:text-red-800">Disconnect</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="messages" class="h-[400px] overflow-y-auto p-4 space-y-4">
-                        <div id="typing-indicator" class="hidden">
-                            <div class="message received">
-                                <div class="typing-animation">
-                                    <span></span>
-                                    <span></span>
-                                    <span></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-					<div id="live-preview" class="text-gray-500 text-sm mt-2 italic hidden"></div>
-                    <div class="border-t p-4">
-                        <div class="flex gap-2">
-                            <input type="text" id="message-input" placeholder="Type your message..." class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                            <button onclick="sendMessage()" class="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700">Send</button>
-                        </div>
-                        
+            <!-- Video Call Section -->
+            <div id="video-section" class="fixed inset-0 bg-black hidden">
+                <div class="relative h-full">
+                    <video id="remote-video" class="w-full h-full object-cover"></video>
+                    <video id="local-video" class="absolute bottom-4 left-4 w-1/4 max-w-[200px] rounded-lg shadow-lg" autoplay muted playsinline></video>
+                    <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-4">
+                        <button onclick="switchCamera()" class="bg-white text-black px-4 py-2 rounded-full hover:bg-gray-200">
+                            Switch Camera
+                        </button>
+                        <button onclick="endVideo()" class="bg-red-600 text-white px-6 py-2 rounded-full hover:bg-red-700">
+                            End Call
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="./main.js"></script>
+
 </body>
 </html>

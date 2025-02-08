@@ -14,42 +14,24 @@
     @apply bg-gray-200 text-gray-800;
 }
 
-#local-video, #remote-video {
-    @apply aspect-video object-cover;
+#local-video {
     transform: scaleX(-1);
 }
 
-.typing-animation {
-    display: flex;
-    gap: 4px;
-    padding: 4px 0;
+.typing-preview {
+    @apply opacity-70;
 }
 
-.typing-animation span {
-    width: 8px;
-    height: 8px;
-    background-color: #6B7280;
-    border-radius: 50%;
-    animation: typing 1s infinite ease-in-out;
+/* Fade out animation for typing preview */
+.typing-preview.fade-out {
+    animation: fadeOut 0.3s ease-out forwards;
 }
 
-.typing-animation span:nth-child(1) {
-    animation-delay: 0.2s;
-}
-
-.typing-animation span:nth-child(2) {
-    animation-delay: 0.4s;
-}
-
-.typing-animation span:nth-child(3) {
-    animation-delay: 0.6s;
-}
-
-@keyframes typing {
-    0%, 100% {
-        transform: translateY(0);
+@keyframes fadeOut {
+    from {
+        opacity: 0.7;
     }
-    50% {
-        transform: translateY(-4px);
+    to {
+        opacity: 0;
     }
 }
